@@ -538,6 +538,8 @@ internal class StratumPerformanceConfig
 
 	public StratumChunkGenerationConfig ChunkGeneration { get; set; } = new StratumChunkGenerationConfig();
 
+	public StratumLightingConfig Lighting { get; set; } = new StratumLightingConfig();
+
 	public StratumChunkRequestManagementConfig ChunkRequestManagement { get; set; } = new StratumChunkRequestManagementConfig();
 
 	public StratumPregenConfig Pregen { get; set; } = new StratumPregenConfig();
@@ -593,6 +595,7 @@ internal class StratumPerformanceConfig
 	{
 		ChunkSending ??= new StratumChunkSendingConfig();
 		ChunkGeneration ??= new StratumChunkGenerationConfig();
+		Lighting ??= new StratumLightingConfig();
 		ChunkRequestManagement ??= new StratumChunkRequestManagementConfig();
 		Pregen ??= new StratumPregenConfig();
 		ItemClump ??= new StratumItemClumpConfig();
@@ -621,6 +624,7 @@ internal class StratumPerformanceConfig
 		Network ??= new StratumNetworkConfig();
 		ChunkSending.EnsureSane();
 		ChunkGeneration.EnsureSane();
+		Lighting.EnsureSane();
 		ChunkRequestManagement.EnsureSane();
 		Pregen.EnsureSane();
 		ItemClump.EnsureSane();
@@ -649,6 +653,20 @@ internal class StratumPerformanceConfig
 		ItemCleanup.EnsureSane();
 		Restart.EnsureSane();
 		Network.EnsureSane();
+	}
+}
+
+internal class StratumLightingConfig
+{
+	public int MaxTasksPerPass { get; set; } = 256;
+
+	// Snapshots cover the full world height; keep each shared session small.
+	public int MaxSunlightColumnsPerBatch { get; set; } = 16;
+
+	public void EnsureSane()
+	{
+		MaxTasksPerPass = Math.Clamp(MaxTasksPerPass, 1, 65536);
+		MaxSunlightColumnsPerBatch = Math.Clamp(MaxSunlightColumnsPerBatch, 1, 256);
 	}
 }
 

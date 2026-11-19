@@ -1,5 +1,5 @@
 diff --git a/VintagestoryLib/Vintagestory.Server/ServerSystemRelight.cs b/VintagestoryLib/Vintagestory.Server/ServerSystemRelight.cs
-index 82aaf34..0784b09 100644
+index 82aaf34..88a314b 100644
 --- a/VintagestoryLib/Vintagestory.Server/ServerSystemRelight.cs
 +++ b/VintagestoryLib/Vintagestory.Server/ServerSystemRelight.cs
 @@ -8,10 +8,12 @@ namespace Vintagestory.Server;
@@ -15,14 +15,29 @@ index 82aaf34..0784b09 100644
  	{
  	}
  
-@@ -51,21 +53,24 @@ public class ServerSystemRelight : ServerSystem
+@@ -31,11 +33,13 @@ public class ServerSystemRelight : ServerSystem
+ 		return 10;
+ 	}
+
+ 	public void ProcessLightingQueue()
+ 	{
+-		while (server.WorldMap.LightingTasks.Count > 0)
++		StratumLightingConfig lighting = StratumRuntime.Config.Performance.Lighting;
++		int remainingTasks = lighting.MaxTasksPerPass;
++		while (remainingTasks-- > 0 && server.WorldMap.LightingTasks.Count > 0)
+ 		{
+ 			UpdateLightingTask updateLightingTask = null;
+ 			lock (server.WorldMap.LightingTasksLock)
+ 			{
+ 				updateLightingTask = server.WorldMap.LightingTasks.Dequeue();
+@@ -51,21 +55,24 @@ public class ServerSystemRelight : ServerSystem
  				{
  					break;
  				}
  			}
  		}
 +
-+		chunkIlluminator.FlushPendingSunLightUpdates(); // Stratum: sun light updates are flushed here
++		chunkIlluminator.FlushPendingSunLightUpdates(lighting.MaxSunlightColumnsPerBatch);
  	}
  
  	public void ProcessLightingTask(UpdateLightingTask task, BlockPos pos)

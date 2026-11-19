@@ -2,7 +2,7 @@ diff --git a/VintagestoryLib/Vintagestory.Common/ChunkIlluminator.cs b/Vintagest
 index e2ca303..3255963 100644
 --- a/VintagestoryLib/Vintagestory.Common/ChunkIlluminator.cs
 +++ b/VintagestoryLib/Vintagestory.Common/ChunkIlluminator.cs
-@@ -1,1110 +1,2112 @@
+@@ -1,1110 +1,2142 @@
  using System;
  using System.Collections.Generic;
 +using System.Collections.Concurrent;
@@ -1420,11 +1420,25 @@ index e2ca303..3255963 100644
 -		int num = posY / 32768 * 32768;
 -		int num2 = 0;
 -		for (int i = 0; i < 6; i++)
++		return FlushPendingSunLightUpdates(int.MaxValue);
++	}
++
++	public FastSetOfLongs FlushPendingSunLightUpdates(int maxColumns)
++	{
++		ArgumentOutOfRangeException.ThrowIfLessThan(maxColumns, 1);
 +		FastSetOfLongs touchedChunks = new FastSetOfLongs();
 +		if (pendingSunlightUpdates.Count == 0) return touchedChunks;
 +
-+		var updates = new Dictionary<long, int>(pendingSunlightUpdates);
-+		pendingSunlightUpdates.Clear();
++		Dictionary<long, int> updates = new Dictionary<long, int>();
++		foreach (KeyValuePair<long, int> update in pendingSunlightUpdates)
++		{
++			if (updates.Count >= maxColumns) break;
++			// Remove only the observed value so concurrent higher updates stay queued.
++			if (((ICollection<KeyValuePair<long, int>>)pendingSunlightUpdates).Remove(update))
++			{
++				updates.Add(update.Key, update.Value);
++			}
++		}
 +
 +		int num = chunkSize;
 +		int chunksPerColumn = mapsizey / num;
@@ -1567,6 +1581,7 @@ index e2ca303..3255963 100644
 +					var staging = session.staging[chunkKey];
 +					var lighting = chunks[cy].Lighting;
 +					bool chunkChanged = false;
++					bool boundaryDarkened = false;
 +					for (int idx = 0; idx < totalBlocks; idx++)
  					{
 -						queueOfInt2.Enqueue(vec3i.X, vec3i.Y, vec3i.Z, num5 + (TileSideEnum.GetOpposite(i) + 1 << 5));
@@ -1576,12 +1591,27 @@ index e2ca303..3255963 100644
 +						{
 +							lighting.SetSunlight(idx, newSun);
 +							chunkChanged = true;
++							int localX = idx % num;
++							int localZ = (idx / num) % num;
++							boundaryDarkened |= newSun < oldSun && (localX == 0 || localX == num - 1 || localZ == 0 || localZ == num - 1);
 +						}
  					}
 +					if (chunkChanged)
 +					{
 +						touchedChunks.Add(chunkKey);
 +						chunks[cy].MarkModified();
++					}
++					if (boundaryDarkened)
++					{
++						// A previous batch may have read this column's old boundary light.
++						foreach (BlockFacing face in BlockFacing.HORIZONTALS)
++						{
++							int neighborX = cx + face.Normali.X;
++							int neighborZ = cz + face.Normali.Z;
++							if (neighborX < 0 || neighborZ < 0 || neighborX >= mapsizex / num || neighborZ >= mapsizez / num) continue;
++							long neighborKey = PackColumn(neighborX, neighborZ, dim);
++							pendingSunlightUpdates.AddOrUpdate(neighborKey, cy, (_, oldY) => Math.Max(oldY, cy));
++						}
 +					}
 +				}
 +			}
